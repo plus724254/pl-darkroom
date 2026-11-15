@@ -1,7 +1,8 @@
 "use strict";
 
 const elements = Object.fromEntries([
-  "sample-button", "stage", "stage-message", "comparison", "photo", "original", "graded",
+  "sample-button", "open-preview", "preview-dialog", "close-preview", "fullscreen-photo",
+  "stage", "stage-message", "comparison", "photo", "original", "graded",
   "split", "file-label", "dimensions", "file-input", "dropzone", "preset", "preset-note", "strength",
   "strength-value", "brightness", "brightness-value", "temperature", "temperature-value",
   "saturation", "saturation-value", "reset-adjustments", "preview-mode", "hold-original", "hold-hint",
@@ -16,6 +17,8 @@ const MAX_EXPORT_EDGE = 8192;
 const SOCIAL_EXPORT_EDGE = 2048;
 const PREVIEW_EDGE = 1100;
 const MAX_FILE_BYTES = 100 * 1024 * 1024;
+const PHOTO_PRESS_DISTANCE = 8;
+const ORIGINAL_HOLD_DELAY = 250;
 const OUTPUT_FORMATS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
 let photo;
@@ -26,7 +29,8 @@ let exportingPhoto;
 let renderFrame;
 let heifModule;
 let heldSource;
-let holdPointer;
+let photoPress;
+let previewClosePressed = false;
 
 const colorControls = ["strength", "brightness", "temperature", "saturation"];
 const cropEditor = createCropEditor((selection, geometry) => {
@@ -118,6 +122,7 @@ function updateDownloadButton() {
   elements.download.disabled = !photo || loading || Boolean(exportingPhoto);
   elements["download-label"].textContent = exportingPhoto ? "處理中…" : "下載照片";
   elements["open-crop"].disabled = !photo || loading;
+  elements["open-preview"].disabled = !photo || loading;
 }
 
 function resetComparison(value) {
@@ -229,7 +234,8 @@ async function loadPhoto(file) {
   const isSample = !file;
   loading = true;
   cropEditor.close();
-  showOriginal(false);
+  clearPhotoPress();
+  elements["preview-dialog"].close();
   setNotice();
   elements.stage.setAttribute("aria-busy", "true");
   elements["stage-message"].textContent = isSample ? "載入示範照…" : "正在讀取並轉色…";
@@ -356,6 +362,17 @@ function resetAdjustments() {
   updateColorControls();
 }
 
+function openFullscreenPreview(source = elements.graded) {
+  const dialog = elements["preview-dialog"];
+  if (loading || !photo || dialog.open) return;
+  const canvas = elements["fullscreen-photo"];
+  canvas.width = source.width;
+  canvas.height = source.height;
+  canvas.getContext("2d").drawImage(source, 0, 0);
+  previewClosePressed = false;
+  dialog.showModal();
+}
+
 function showOriginal(visible) {
   if (visible && (loading || !photo || elements["hold-original"].hidden)) return;
   if (visible && heldSource !== photo.source) {
@@ -372,25 +389,14 @@ function showOriginal(visible) {
 }
 
 function updatePreviewMode() {
+  clearPhotoPress();
   const mode = elements["preview-mode"].querySelector("input:checked").value;
   elements.comparison.dataset.mode = mode;
   elements.split.hidden = mode !== "split";
   elements["hold-original"].hidden = elements["hold-hint"].hidden = mode !== "direct";
-  showOriginal(false);
 }
 
 const hold = elements["hold-original"];
-hold.addEventListener("pointerdown", event => {
-  if (!event.isPrimary || event.button !== 0 || loading) return;
-  holdPointer = event.pointerId;
-  hold.setPointerCapture(event.pointerId);
-  showOriginal(true);
-});
-hold.addEventListener("lostpointercapture", event => {
-  if (event.pointerId !== holdPointer) return;
-  holdPointer = undefined;
-  showOriginal(false);
-});
 hold.addEventListener("contextmenu", event => event.preventDefault());
 hold.addEventListener("keydown", event => {
   if (event.key !== " " && event.key !== "Enter") return;
@@ -401,24 +407,82 @@ hold.addEventListener("keyup", event => {
   if (event.key === " " || event.key === "Enter") showOriginal(false);
 });
 hold.addEventListener("blur", () => showOriginal(false));
-window.addEventListener("blur", () => showOriginal(false));
 
 function dragComparison(event) {
   const rect = elements.photo.getBoundingClientRect();
   resetComparison(clamp(Math.round(100 * (event.clientX - rect.left) / rect.width), 0, 100));
 }
 
-elements.split.addEventListener("pointerdown", event => {
-  if (!event.isPrimary || event.button !== 0) return;
-  event.preventDefault();
-  elements.split.focus({ preventScroll: true });
-  elements.split.setPointerCapture(event.pointerId);
-  dragComparison(event);
-});
-elements.split.addEventListener("pointermove", event => {
-  if (elements.split.hasPointerCapture(event.pointerId)) dragComparison(event);
+function clearPhotoPress() {
+  clearTimeout(photoPress?.holdTimer);
+  photoPress = undefined;
+  showOriginal(false);
+}
+
+function movedFromPhotoPress(event, press) {
+  return Math.hypot(event.clientX - press.x, event.clientY - press.y) >= PHOTO_PRESS_DISTANCE;
+}
+
+elements.photo.addEventListener("pointerdown", event => {
+  if (!event.isPrimary || event.button !== 0 || loading || !photo) return;
+  const mode = elements.comparison.dataset.mode;
+  const layer = event.target.closest(".photo-layer");
+  if (mode === "side" && !layer) return;
+  clearPhotoPress();
+
+  const press = {
+    id: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    mode,
+    source: mode === "side" && layer.classList.contains("original-layer") ? elements.original : elements.graded,
+    moved: false,
+    held: false,
+  };
+  photoPress = press;
+  event.target.setPointerCapture(event.pointerId);
+
+  if (mode === "direct") {
+    press.holdTimer = setTimeout(() => {
+      press.held = true;
+      showOriginal(true);
+    }, ORIGINAL_HOLD_DELAY);
+  }
 });
 
+elements.photo.addEventListener("pointermove", event => {
+  const press = photoPress;
+  if (event.pointerId !== press?.id || press.held) return;
+  if (!press.moved && movedFromPhotoPress(event, press)) {
+    press.moved = true;
+    clearTimeout(press.holdTimer);
+    if (press.mode === "split") elements.split.focus({ preventScroll: true });
+  }
+  if (press.moved && press.mode === "split") dragComparison(event);
+});
+
+elements.photo.addEventListener("pointerup", event => {
+  const press = photoPress;
+  if (event.pointerId !== press?.id) return;
+  clearPhotoPress();
+  if (!press.held && !press.moved && !movedFromPhotoPress(event, press)) {
+    openFullscreenPreview(press.source);
+  }
+});
+
+for (const type of ["pointercancel", "lostpointercapture"]) {
+  elements.photo.addEventListener(type, event => {
+    if (event.pointerId === photoPress?.id) clearPhotoPress();
+  });
+}
+window.addEventListener("blur", clearPhotoPress);
+
+elements["open-preview"].addEventListener("click", () => openFullscreenPreview());
+elements["close-preview"].addEventListener("pointerdown", () => { previewClosePressed = true; });
+elements["close-preview"].addEventListener("click", event => {
+  // A browser can send the opening tap's click to the newly visible dialog.
+  if (event.detail === 0 || previewClosePressed) elements["preview-dialog"].close();
+});
 elements["sample-button"].addEventListener("click", () => loadPhoto());
 elements["file-input"].addEventListener("change", event => {
   const file = event.target.files[0];

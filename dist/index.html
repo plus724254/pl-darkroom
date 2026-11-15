@@ -31,7 +31,11 @@
     <div class="workspace">
       <section class="preview panel" aria-labelledby="preview-title">
         <header class="panel-title preview-header">
-          <h2 id="preview-title"><i class="focus-icon" aria-hidden="true"></i>照片預覽</h2>
+          <h2 id="preview-title">
+            <button id="open-preview" class="preview-title-button" type="button" aria-haspopup="dialog" aria-controls="preview-dialog" aria-label="照片預覽，放大照片" disabled>
+              <i class="focus-icon" aria-hidden="true"></i>照片預覽
+            </button>
+          </h2>
           <button id="sample-button" class="text-button" type="button">使用示範照 <span aria-hidden="true">↗</span></button>
         </header>
         <div id="stage" class="stage" aria-busy="true">
@@ -155,6 +159,13 @@
       <a href="./third-party-licenses.html">第三方授權 · HEIC 解碼器（LGPL）</a>
     </footer>
   </main>
+
+  <dialog id="preview-dialog" class="preview-dialog" aria-label="全螢幕照片預覽">
+    <button id="close-preview" class="close-preview" type="button" aria-label="縮回照片">
+      <canvas id="fullscreen-photo" aria-hidden="true"></canvas>
+      <span class="close-preview-icon" aria-hidden="true">×</span>
+    </button>
+  </dialog>
 
   <dialog id="crop-dialog" class="crop-dialog" aria-labelledby="crop-title">
     <header class="panel-title">
