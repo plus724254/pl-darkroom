@@ -166,9 +166,10 @@ function selectedPreset() {
 }
 
 function colorSettings() {
+  const preset = photoPresets[selectedPreset().value];
   return {
-    preset: photoPresets[selectedPreset().value],
-    strength: Number(elements.strength.value) / 100,
+    preset,
+    strength: preset ? Number(elements.strength.value) / 100 : 0,
     brightness: Number(elements.brightness.value),
     temperature: Number(elements.temperature.value),
     saturation: Number(elements.saturation.value),
@@ -177,7 +178,7 @@ function colorSettings() {
 
 function editPixels(pixels, settings) {
   const { preset, strength, brightness, temperature, saturation } = settings;
-  if (strength) preset.grade(pixels, strength);
+  if (preset && strength) preset.grade(pixels, strength);
   if (!brightness && !temperature && !saturation) return;
 
   const exposure = 2 ** (brightness / 75);
@@ -249,6 +250,8 @@ function initializePhoto(source, name, isSample, inputType) {
   next.geometry = { turn: 0, crop: fullCrop(next, 0), ratio: "free" };
   photo = next;
   elements.format.value = /\.png$/i.test(name) || inputType === "image/png" ? "image/png" : "image/jpeg";
+  elements.preset.querySelector("[value='none']").checked = true;
+  updatePreset();
   resetAdjustments();
   preparePreview();
   if (previous && previous !== exportingPhoto) previous.source.close?.();
@@ -353,7 +356,9 @@ async function exportPhoto() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${selection.name.replace(/\.[^.]+$/, "") || "photo"}-${settings.preset.suffix}.${OUTPUT_FORMATS[format]}`;
+    const name = selection.name.replace(/\.[^.]+$/, "") || "photo";
+    const suffix = settings.preset ? `-${settings.preset.suffix}` : "";
+    link.download = `${name}${suffix}.${OUTPUT_FORMATS[format]}`;
     document.body.append(link);
     link.click();
     link.remove();
@@ -378,7 +383,9 @@ function queuePreview() {
 }
 
 function updatePreset() {
-  elements["preset-note"].textContent = selectedPreset().dataset.note;
+  const option = selectedPreset();
+  elements["preset-note"].textContent = option.dataset.note;
+  elements.strength.disabled = !photoPresets[option.value];
   queuePreview();
 }
 

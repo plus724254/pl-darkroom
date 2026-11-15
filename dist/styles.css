@@ -134,7 +134,7 @@ select { width: 100%; min-height: 40px; appearance: none; border: 1px solid #d3d
 select:hover { border-color: #979f7e; }
 .preset-field { min-inline-size: 0; border: 0; padding: 0; margin: 0; }
 .preset-field legend { padding: 0; }
-.preset-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.preset-options { display: grid; grid-template-columns: minmax(0, .65fr) repeat(4, minmax(0, 1fr)); gap: 4px; }
 .preset-option { position: relative; display: grid; cursor: pointer; }
 .preset-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .preset-tile { display: grid; place-content: center; min-height: 44px; padding: 4px 3px; border: 1px solid var(--editor-line); text-align: center; border-radius: 7px; font-size: 12px; font-weight: 700; line-height: 1.2; }
@@ -150,6 +150,9 @@ select:hover { border-color: #979f7e; }
 .editor-range::-webkit-slider-thumb { appearance: none; width: 21px; height: 21px; margin-top: -8px; border: 2px solid #fcfbf5; border-radius: 50%; background: #566632; box-shadow: 0 0 0 1px #566632; }
 .editor-range::-moz-range-thumb { width: 17px; height: 17px; border: 2px solid #fcfbf5; border-radius: 50%; background: #566632; box-shadow: 0 0 0 1px #566632; }
 .label-row .field-label { margin-bottom: 0; }
+.strength-setting:has(input:disabled) { opacity: .5; }
+.strength-setting:has(input:disabled) output { visibility: hidden; }
+.editor-range:disabled { cursor: default; }
 .adjustment-fields { display: grid; gap: 4px 16px; }
 .adjustment-fields button { justify-self: start; }
 .secondary-button { min-height: 44px; padding: 0 12px; border: 1px solid #d3d6c2; border-radius: 7px; background: var(--panel); font-size: 13px; font-weight: 750; }
@@ -217,4 +220,7 @@ select:hover { border-color: #979f7e; }
   .editor-photo-info { display: flex; align-items: center; justify-content: center; gap: 8px; }
   .tool-bar { padding-block: 3px; }
   .tool-button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; }
+}
+@media (max-width: 360px) {
+  .preset-tile { padding-inline: 1px; font-size: 11px; }
 }

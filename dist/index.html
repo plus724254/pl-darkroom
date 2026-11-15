@@ -79,7 +79,11 @@
             <legend class="sr-only">濾鏡風格</legend>
             <div class="preset-options">
               <label class="preset-option">
-                <input type="radio" name="preset" value="positive" data-note="低飽和、冷暗部，帶有紀實感。" checked>
+                <input type="radio" name="preset" value="none" data-note="未套用濾鏡。" checked>
+                <span class="preset-tile">無</span>
+              </label>
+              <label class="preset-option">
+                <input type="radio" name="preset" value="positive" data-note="低飽和、冷暗部，帶有紀實感。">
                 <span class="preset-tile">經典正片</span>
               </label>
               <label class="preset-option">
@@ -95,12 +99,12 @@
                 <span class="preset-tile">彩色效果</span>
               </label>
             </div>
-            <p class="style-note" id="preset-note">低飽和、冷暗部，帶有紀實感。</p>
+            <p class="style-note" id="preset-note">未套用濾鏡。</p>
           </fieldset>
 
           <div class="setting strength-setting">
             <div class="label-row"><label class="field-label" for="strength">濾鏡強度</label><output id="strength-value" for="strength">100%</output></div>
-            <input id="strength" class="editor-range" type="range" min="0" max="100" value="100">
+            <input id="strength" class="editor-range" type="range" min="0" max="100" value="100" disabled>
           </div>
         </section>
 
