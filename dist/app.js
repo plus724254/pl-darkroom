@@ -1,15 +1,18 @@
 "use strict";
 
 const elements = Object.fromEntries([
+  "chooser", "editor", "chooser-status", "back-to-chooser", "return-editor", "tool-dock",
   "sample-button", "open-preview", "preview-dialog", "close-preview", "fullscreen-photo",
   "stage", "stage-message", "comparison", "photo", "original", "graded",
   "split", "file-label", "dimensions", "file-input", "dropzone", "preset", "preset-note", "strength",
   "strength-value", "brightness", "brightness-value", "temperature", "temperature-value",
-  "saturation", "saturation-value", "reset-adjustments", "preview-mode", "hold-original", "hold-hint",
+  "saturation", "saturation-value", "reset-adjustments", "preview-mode", "hold-original", "compare-hint",
   "held-preview", "held-original", "open-crop", "export-size", "export-dimensions", "format-box",
   "format", "download", "download-label", "notice",
 ].map(id => [id, document.getElementById(id)]));
 
+const toolButtons = [...elements["tool-dock"].querySelectorAll("[aria-expanded]")];
+const themeColor = document.querySelector('meta[name="theme-color"]');
 const originalContext = elements.original.getContext("2d", { willReadFrequently: true });
 const gradedContext = elements.graded.getContext("2d");
 const MAX_EXPORT_PIXELS = 50_000_000;
@@ -123,6 +126,34 @@ function updateDownloadButton() {
   elements["download-label"].textContent = exportingPhoto ? "處理中…" : "下載照片";
   elements["open-crop"].disabled = !photo || loading;
   elements["open-preview"].disabled = !photo || loading;
+  elements["return-editor"].disabled = loading;
+}
+
+function showEditor(visible) {
+  elements.chooser.hidden = visible;
+  elements.editor.hidden = !visible;
+  elements["return-editor"].hidden = !photo;
+  if (visible) setPhotoLoadMessage();
+  themeColor.content = visible ? "#20221a" : "#f6f5ee";
+  window.scrollTo(0, 0);
+  const target = visible ? elements["open-preview"] : elements["file-input"];
+  target.focus({ preventScroll: true });
+}
+
+function setActiveTool(active) {
+  for (const button of toolButtons) {
+    const expanded = button === active;
+    button.setAttribute("aria-expanded", String(expanded));
+    document.getElementById(button.getAttribute("aria-controls")).hidden = !expanded;
+  }
+}
+
+function setPhotoLoadMessage(message = "", isError = false) {
+  const status = elements["chooser-status"];
+  status.textContent = message;
+  status.classList.toggle("error", isError);
+  elements["stage-message"].textContent = message;
+  elements["stage-message"].hidden = !message;
 }
 
 function resetComparison(value) {
@@ -226,6 +257,8 @@ function initializePhoto(source, name, isSample, inputType) {
   elements["file-label"].textContent = isSample ? "示範照片 · 台北街景" : name;
   elements["file-label"].title = name;
   elements.comparison.hidden = false;
+  elements["preview-mode"].querySelector('[value="direct"]').checked = true;
+  updatePreviewMode();
   resetComparison(50);
 }
 
@@ -238,10 +271,10 @@ async function loadPhoto(file) {
   elements["preview-dialog"].close();
   setNotice();
   elements.stage.setAttribute("aria-busy", "true");
-  elements["stage-message"].textContent = isSample ? "載入示範照…" : "正在讀取並轉色…";
-  elements["stage-message"].hidden = false;
+  setPhotoLoadMessage(isSample ? "載入示範照…" : "正在讀取照片…");
   updateDownloadButton();
 
+  let loaded = false;
   try {
     if (file?.size > MAX_FILE_BYTES) throw new Error("單張照片請小於 100 MB。");
     const source = isSample ? await imageFromUrl(demoPhotoUrl) : await decodeFile(file);
@@ -250,19 +283,21 @@ async function loadPhoto(file) {
       return;
     }
     initializePhoto(source, file?.name || "taipei-sample.jpg", isSample, file?.type);
-    elements["stage-message"].hidden = true;
+    loaded = true;
   } catch (error) {
     if (sequence !== loadSequence) return;
     const message = isSample ? "示範照載入失敗，請選擇一張照片。"
       : error.message || "照片處理失敗，請重新選擇檔案。";
-    setNotice(message, true);
-    elements["stage-message"].textContent = "請選擇一張照片";
-    elements["stage-message"].hidden = Boolean(photo);
+    setPhotoLoadMessage(message, true);
   } finally {
     if (sequence === loadSequence) {
       loading = false;
       elements.stage.setAttribute("aria-busy", "false");
       updateDownloadButton();
+      if (loaded) {
+        setActiveTool();
+        showEditor(true);
+      }
     }
   }
 }
@@ -390,10 +425,12 @@ function showOriginal(visible) {
 
 function updatePreviewMode() {
   clearPhotoPress();
-  const mode = elements["preview-mode"].querySelector("input:checked").value;
+  const option = elements["preview-mode"].querySelector("input:checked");
+  const mode = option.value;
   elements.comparison.dataset.mode = mode;
   elements.split.hidden = mode !== "split";
-  elements["hold-original"].hidden = elements["hold-hint"].hidden = mode !== "direct";
+  elements["hold-original"].hidden = mode !== "direct";
+  elements["compare-hint"].textContent = option.dataset.hint;
 }
 
 const hold = elements["hold-original"];
@@ -425,6 +462,7 @@ function movedFromPhotoPress(event, press) {
 
 elements.photo.addEventListener("pointerdown", event => {
   if (!event.isPrimary || event.button !== 0 || loading || !photo) return;
+  elements["stage-message"].hidden = true;
   const mode = elements.comparison.dataset.mode;
   const layer = event.target.closest(".photo-layer");
   if (mode === "side" && !layer) return;
@@ -456,7 +494,7 @@ elements.photo.addEventListener("pointermove", event => {
   if (!press.moved && movedFromPhotoPress(event, press)) {
     press.moved = true;
     clearTimeout(press.holdTimer);
-    if (press.mode === "split") elements.split.focus({ preventScroll: true });
+    if (press.mode === "split" && event.pointerType === "mouse") elements.split.focus({ preventScroll: true });
   }
   if (press.moved && press.mode === "split") dragComparison(event);
 });
@@ -484,6 +522,27 @@ elements["close-preview"].addEventListener("click", event => {
   if (event.detail === 0 || previewClosePressed) elements["preview-dialog"].close();
 });
 elements["sample-button"].addEventListener("click", () => loadPhoto());
+elements["back-to-chooser"].addEventListener("click", () => showEditor(false));
+elements["return-editor"].addEventListener("click", () => showEditor(true));
+for (const button of toolButtons) {
+  button.addEventListener("click", event => {
+    if (!loading) elements["stage-message"].hidden = true;
+    const opening = button.getAttribute("aria-expanded") === "false";
+    setActiveTool(opening ? button : undefined);
+    if (opening) {
+      const panel = document.getElementById(button.getAttribute("aria-controls"));
+      panel.scrollTop = 0;
+      if (event.detail === 0) panel.focus({ preventScroll: true });
+    }
+  });
+}
+elements["tool-dock"].addEventListener("keydown", event => {
+  if (event.key !== "Escape") return;
+  const active = toolButtons.find(button => button.getAttribute("aria-expanded") === "true");
+  if (!active) return;
+  setActiveTool();
+  active.focus({ preventScroll: true });
+});
 elements["file-input"].addEventListener("change", event => {
   const file = event.target.files[0];
   event.target.value = "";
@@ -493,7 +552,10 @@ elements.preset.addEventListener("change", updatePreset);
 for (const id of colorControls) elements[id].addEventListener("input", updateColorControls);
 elements["reset-adjustments"].addEventListener("click", resetAdjustments);
 elements["preview-mode"].addEventListener("change", updatePreviewMode);
-elements["open-crop"].addEventListener("click", () => cropEditor.open(photo));
+elements["open-crop"].addEventListener("click", () => {
+  setActiveTool();
+  cropEditor.open(photo);
+});
 elements["export-size"].addEventListener("change", updateExportOptions);
 elements.split.addEventListener("input", () => resetComparison(elements.split.value));
 elements.download.addEventListener("click", exportPhoto);
@@ -519,4 +581,3 @@ for (const target of [elements.dropzone, elements.stage]) {
 updatePreset();
 updatePreviewMode();
 updateColorControls();
-loadPhoto();
