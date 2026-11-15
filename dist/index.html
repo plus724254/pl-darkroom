@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="在瀏覽器內套用四種濾鏡、調整色彩、裁切並下載照片。">
+  <meta name="theme-color" content="#f6f5ee">
+  <title>光影暗房</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./assets/taipei-sample.js"></script>
+  <script defer src="./grade.js"></script>
+  <script defer src="./crop.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="frame masthead-content">
+      <div class="brand"><i class="brand-mark" aria-hidden="true"><span></span></i><span>光影暗房</span></div>
+      <p class="privacy"><i aria-hidden="true"></i>照片僅在裝置上處理</p>
+    </div>
+  </header>
+
+  <main class="frame">
+    <section class="intro" aria-labelledby="title">
+      <div>
+        <h1 id="title">光影暗房<span>.</span></h1>
+        <p>一張照片，四種調色風格。</p>
+      </div>
+    </section>
+
+    <div class="workspace">
+      <section class="preview panel" aria-labelledby="preview-title">
+        <header class="panel-title preview-header">
+          <h2 id="preview-title"><i class="focus-icon" aria-hidden="true"></i>照片預覽</h2>
+          <button id="sample-button" class="text-button" type="button">使用示範照 <span aria-hidden="true">↗</span></button>
+        </header>
+        <div id="stage" class="stage" aria-busy="true">
+          <p id="stage-message" class="stage-message">載入示範照…</p>
+          <div id="comparison" class="comparison" hidden>
+            <div id="photo" class="photo">
+              <div class="photo-layer edited-layer">
+                <canvas id="graded" aria-label="編輯後的照片" role="img"></canvas>
+                <span class="image-label after" aria-hidden="true">編輯後</span>
+              </div>
+              <div class="photo-layer original-layer">
+                <canvas id="original" aria-label="套用色彩前的照片" role="img"></canvas>
+                <span class="image-label before" aria-hidden="true">原圖</span>
+              </div>
+              <div class="divider" aria-hidden="true"><span>‹&nbsp; ›</span></div>
+              <input id="split" class="compare-range" type="range" min="0" max="100" value="50" aria-label="原圖顯示比例" hidden>
+              <button id="hold-original" class="hold-original" type="button" aria-label="按住顯示原圖"></button>
+            </div>
+            <div id="held-preview" class="held-preview" hidden>
+              <canvas id="held-original" role="img" aria-label="未編輯的原始照片"></canvas>
+              <span class="image-label before" aria-hidden="true">原圖</span>
+            </div>
+          </div>
+        </div>
+        <div class="preview-controls">
+          <fieldset id="preview-mode" class="preview-modes">
+            <legend class="sr-only">預覽模式</legend>
+            <label><input type="radio" name="preview-mode" value="direct" checked><span>直接顯示</span></label>
+            <label><input type="radio" name="preview-mode" value="split"><span>拉桿比較</span></label>
+            <label><input type="radio" name="preview-mode" value="side"><span>並排檢視</span></label>
+          </fieldset>
+          <button id="open-crop" class="text-button crop-button" type="button" disabled>裁切／旋轉</button>
+        </div>
+        <div class="preview-footer">
+          <span id="file-label" class="file-label">示範照片</span><span id="hold-hint">按住照片看原圖</span>
+          <span id="dimensions" class="dimensions"></span>
+        </div>
+      </section>
+
+      <aside class="settings panel" aria-labelledby="settings-title">
+        <header class="panel-title"><h2 id="settings-title"><i class="settings-icon" aria-hidden="true"><b></b><b></b><b></b></i>轉色設定</h2></header>
+        <div class="settings-body">
+          <div class="setting">
+            <label class="field-label" for="file-input">選擇照片</label>
+            <div class="dropzone" id="dropzone">
+              <input type="file" id="file-input" aria-describedby="input-formats" accept=".jpg,.jpeg,.jfif,.png,.webp,.avif,.gif,.bmp,.heic,.heif,image/jpeg,image/png,image/webp,image/avif,image/gif,image/bmp,image/heic,image/heif">
+              <span class="upload-icon" aria-hidden="true">↑</span>
+              <span class="upload-action">點擊或拖曳照片</span>
+              <span id="input-formats" class="upload-formats">JPEG、PNG、WebP、HEIC 等</span>
+            </div>
+          </div>
+
+          <fieldset class="setting preset-field" id="preset" aria-describedby="preset-note">
+            <legend class="field-label">濾鏡風格</legend>
+            <div class="preset-options">
+              <label class="preset-option">
+                <input type="radio" name="preset" value="positive" data-note="低飽和、冷暗部，帶有紀實感。" checked>
+                <span class="preset-tile">經典正片</span>
+              </label>
+              <label class="preset-option">
+                <input type="radio" name="preset" value="negative" data-note="暗部偏青綠、亮部帶洋紅，對比更深。">
+                <span class="preset-tile">經典負片</span>
+              </label>
+              <label class="preset-option">
+                <input type="radio" name="preset" value="standard" data-note="自然色彩與適中對比，適合日常照片。">
+                <span class="preset-tile">標準／通用</span>
+              </label>
+              <label class="preset-option">
+                <input type="radio" name="preset" value="color-effect" data-note="加深高飽和紅、黃、綠色的層次。">
+                <span class="preset-tile">彩色效果</span>
+              </label>
+            </div>
+            <p class="style-note" id="preset-note">低飽和、冷暗部，帶有紀實感。</p>
+          </fieldset>
+
+          <div class="setting strength-setting">
+            <div class="label-row"><label class="field-label" for="strength">濾鏡強度</label><output id="strength-value" for="strength">100%</output></div>
+            <input id="strength" class="editor-range" type="range" min="0" max="100" value="100">
+          </div>
+
+          <details class="adjustments">
+            <summary>色彩調整</summary>
+            <div class="adjustment-fields">
+              <div>
+                <div class="label-row"><label class="field-label" for="brightness">亮度</label><output id="brightness-value" for="brightness">0</output></div>
+                <input id="brightness" class="editor-range" type="range" min="-100" max="100" value="0">
+              </div>
+              <div>
+                <div class="label-row"><label class="field-label" for="temperature">色溫</label><output id="temperature-value" for="temperature">0</output></div>
+                <input id="temperature" class="editor-range" type="range" min="-100" max="100" value="0">
+              </div>
+              <div>
+                <div class="label-row"><label class="field-label" for="saturation">飽和度</label><output id="saturation-value" for="saturation">0</output></div>
+                <input id="saturation" class="editor-range" type="range" min="-100" max="100" value="0">
+              </div>
+              <button id="reset-adjustments" class="secondary-button" type="button">重設色彩</button>
+            </div>
+          </details>
+
+          <div class="export-group">
+            <label class="field-label" for="export-size">下載尺寸</label>
+            <div class="select-box size-box">
+              <select id="export-size">
+                <option value="full">原始尺寸</option>
+                <option value="social">社群版 · 壓縮 JPG</option>
+              </select>
+            </div>
+            <p id="export-dimensions" class="export-note"></p>
+            <div class="export-controls">
+              <div class="select-box format-box" id="format-box"><select id="format" aria-label="下載格式"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></div>
+              <button id="download" class="download" type="button" disabled><span class="download-icon" aria-hidden="true">↓</span><span id="download-label">下載照片</span></button>
+            </div>
+            <p id="notice" class="notice" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="frame-footer">
+      <p>輸入支援 JPEG、PNG、WebP、AVIF、GIF、BMP、HEIC / HEIF<span class="footer-detail"> · 動態圖取第一幀</span></p>
+      <a href="./third-party-licenses.html">第三方授權 · HEIC 解碼器（LGPL）</a>
+    </footer>
+  </main>
+
+  <dialog id="crop-dialog" class="crop-dialog" aria-labelledby="crop-title">
+    <header class="panel-title">
+      <h2 id="crop-title">裁切與旋轉</h2>
+      <button id="cancel-crop" class="secondary-button" type="button">取消</button>
+    </header>
+    <div class="crop-content">
+      <div class="crop-stage">
+        <div id="crop-photo" class="crop-photo">
+          <canvas id="crop-canvas" aria-label="裁切預覽" role="img"></canvas>
+          <div id="crop-selection" class="crop-selection" tabindex="0" aria-label="裁切範圍，使用方向鍵移動">
+            <button class="crop-handle" data-corner="nw" type="button" aria-label="左上角，使用方向鍵調整"></button>
+            <button class="crop-handle" data-corner="ne" type="button" aria-label="右上角，使用方向鍵調整"></button>
+            <button class="crop-handle" data-corner="sw" type="button" aria-label="左下角，使用方向鍵調整"></button>
+            <button class="crop-handle" data-corner="se" type="button" aria-label="右下角，使用方向鍵調整"></button>
+          </div>
+        </div>
+      </div>
+      <div class="crop-tools">
+        <div class="select-box">
+          <select id="crop-ratio" aria-label="裁切比例">
+            <option value="free">自由比例</option><option value="1:1">1:1</option>
+            <option value="4:5">4:5</option><option value="5:4">5:4</option>
+            <option value="3:2">3:2</option><option value="2:3">2:3</option>
+            <option value="16:9">16:9</option><option value="9:16">9:16</option>
+          </select>
+        </div>
+        <button id="rotate-left" class="secondary-button" type="button" aria-label="向左旋轉 90 度">↶ 90°</button>
+        <button id="rotate-right" class="secondary-button" type="button" aria-label="向右旋轉 90 度">↷ 90°</button>
+      </div>
+      <div class="crop-actions">
+        <button id="reset-crop" class="secondary-button" type="button">重設</button>
+        <button id="apply-crop" class="download" type="button">套用</button>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>
