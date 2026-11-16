@@ -165,18 +165,20 @@ const ricohNegativeChroma = [
   [24.03, 30.98, 30.80],
 ];
 
+// Fuji coefficients fitted to four Provia/target comparison scenes, then
+// validated against a separate author's scene. See audit/results/fit-experiment.json.
 const photoPresets = {
   positive: createPreset("經典正片", rgb => toneDelta(rgb, {
-    contrast: 0.32,
-    saturation: 0.76,
-    shadows: [-0.025, 0.008, 0.043],
-    highlights: [0.024, 0.010, -0.015],
+    contrast: 0.1185695166943149,
+    saturation: 0.8336440326237472,
+    shadows: [-0.02321060552877227, -0.011717968165747439, -0.01191791703070777],
+    highlights: [-0.0018865382372726253, 0.013324153778729982, 0.0048309497764622775],
   })),
   negative: createPreset("經典負片", rgb => toneDelta(rgb, {
-    contrast: 0.92,
-    saturation: 0.92,
-    shadows: [-0.046, 0.035, 0.023],
-    highlights: [0.049, -0.033, 0.021],
+    contrast: 0.8623534335825805,
+    saturation: 0.7974396530535328,
+    shadows: [0.06679644167992155, 0.09176561880369541, 0.08225768850853139],
+    highlights: [0.05935442837448009, -0.013328365687180953, -0.033134362079884544],
   })),
   standard: createPreset("標準通用", rgb => toneDelta(rgb, {
     contrast: 0.22,
