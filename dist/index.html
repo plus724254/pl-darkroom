@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="./styles.css">
   <script defer src="./assets/taipei-sample.js"></script>
   <script defer src="./grade.js"></script>
+  <script defer src="./grain.js"></script>
   <script defer src="./crop.js"></script>
   <script defer src="./app.js"></script>
 </head>
@@ -118,8 +119,27 @@
           </div>
 
           <div class="setting strength-setting">
-            <div class="label-row"><label class="field-label" for="strength">濾鏡強度</label><output id="strength-value" for="strength">100%</output></div>
+            <div class="grain-toolbar">
+              <div id="strength-label" class="label-row"><label class="field-label" for="strength">濾鏡強度</label><output id="strength-value" for="strength">100%</output></div>
+              <button id="grain-toggle" class="grain-button grain-toggle" type="button" aria-controls="grain-controls" aria-expanded="false">底片顆粒 <span id="grain-status">關閉</span></button>
+              <button id="grain-reset" class="grain-button" type="button" disabled hidden>還原預設</button>
+            </div>
             <input id="strength" class="editor-range" type="range" min="0" max="100" value="100" disabled>
+            <div id="grain-controls" class="grain-controls" role="group" aria-label="底片顆粒設定" hidden>
+              <div class="select-box">
+                <select id="grain-strength" aria-label="顆粒強度">
+                  <option value="off">關閉</option>
+                  <option value="weak">弱顆粒</option>
+                  <option value="strong">強顆粒</option>
+                </select>
+              </div>
+              <div class="select-box">
+                <select id="grain-size" aria-label="顆粒大小" disabled>
+                  <option value="fine">細顆粒</option>
+                  <option value="coarse">粗顆粒</option>
+                </select>
+              </div>
+            </div>
           </div>
         </section>
 

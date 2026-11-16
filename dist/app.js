@@ -5,13 +5,14 @@ const elements = Object.fromEntries([
   "sample-button", "open-preview", "preview-dialog", "close-preview", "fullscreen-photo",
   "stage", "stage-message", "comparison", "photo", "original", "graded",
   "split", "file-label", "dimensions", "file-input", "dropzone", "filter-series", "preset", "preset-note", "strength",
-  "strength-value", "brightness", "brightness-value", "temperature", "temperature-value",
+  "strength-label", "strength-value", "grain-toggle", "grain-status", "grain-controls",
+  "grain-strength", "grain-size", "grain-reset", "brightness", "brightness-value", "temperature", "temperature-value",
   "saturation", "saturation-value", "reset-adjustments", "preview-mode", "hold-original", "compare-hint",
   "held-preview", "held-original", "open-crop", "export-size", "export-dimensions", "format-box",
   "format", "download", "download-label", "notice",
 ].map(id => [id, document.getElementById(id)]));
 
-const toolButtons = [...elements["tool-dock"].querySelectorAll("[aria-expanded]")];
+const toolButtons = [...elements["tool-dock"].querySelectorAll(".tool-button[aria-expanded]")];
 const themeColor = document.querySelector('meta[name="theme-color"]');
 const originalContext = elements.original.getContext("2d", { willReadFrequently: true });
 const gradedContext = elements.graded.getContext("2d");
@@ -26,6 +27,7 @@ const OUTPUT_FORMATS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": 
 
 let photo;
 let previewPixels;
+let previewGrain;
 let loadSequence = 0;
 let loading = false;
 let exportingPhoto;
@@ -141,6 +143,7 @@ function showEditor(visible) {
 }
 
 function setActiveTool(active) {
+  if (active?.id !== "filter-tool") setGrainControlsOpen(false);
   for (const button of toolButtons) {
     const expanded = button === active;
     button.setAttribute("aria-expanded", String(expanded));
@@ -163,6 +166,10 @@ function resetComparison(value) {
 
 function selectedPreset() {
   return elements.preset.querySelector("input:checked");
+}
+
+function selectedGrain(presetId = selectedPreset().value) {
+  return photo?.grainOverrides.get(presetId) ?? filmGrainProfiles[presetId] ?? defaultFilmGrain;
 }
 
 function colorSettings() {
@@ -202,6 +209,14 @@ function renderPreview() {
   const { width, height, data } = previewPixels;
   const pixels = new ImageData(new Uint8ClampedArray(data), width, height);
   editPixels(pixels.data, colorSettings());
+  const { strength, size } = selectedGrain();
+  if (strength !== "off") {
+    if (previewGrain?.size !== size) {
+      const field = createFilmGrainField(width, height, photo.geometry.crop, photo.grainSeed, size);
+      previewGrain = { size, field: field(0, height) };
+    }
+    applyFilmGrain(pixels.data, previewGrain.field, strength);
+  }
   gradedContext.putImageData(pixels, 0, 0);
 }
 
@@ -229,6 +244,7 @@ function updateExportOptions() {
 
 function preparePreview() {
   cancelAnimationFrame(renderFrame);
+  previewGrain = undefined;
   const { turn, crop } = photo.geometry;
   const { width: previewWidth, height: previewHeight } = scaledSize(crop, PREVIEW_EDGE);
   elements.original.width = elements.graded.width = previewWidth;
@@ -246,7 +262,11 @@ function initializePhoto(source, name, isSample, inputType) {
   const height = source.naturalHeight || source.height;
   if (!width || !height) throw new Error("照片的尺寸無效。");
   const previous = photo;
-  const next = { source, name, width, height };
+  const next = {
+    source, name, width, height,
+    grainSeed: filmGrainSeed(name, width, height),
+    grainOverrides: new Map(),
+  };
   next.geometry = { turn: 0, crop: fullCrop(next, 0), ratio: "free" };
   photo = next;
   elements.format.value = /\.png$/i.test(name) || inputType === "image/png" ? "image/png" : "image/jpeg";
@@ -322,6 +342,7 @@ async function exportPhoto() {
   const selection = photo;
   const sequence = loadSequence;
   const settings = colorSettings();
+  const grain = selectedGrain();
   const { turn, crop } = selection.geometry;
   const { width, height, format, quality } = exportOptions();
   const canvas = document.createElement("canvas");
@@ -336,11 +357,18 @@ async function exportPhoto() {
     const context = canvas.getContext("2d", { willReadFrequently: true });
     drawPhoto(context, selection, turn, crop);
 
-    if (settings.strength || settings.brightness || settings.temperature || settings.saturation) {
-      const rows = Math.max(1, Math.floor(800_000 / width));
+    if (settings.strength || settings.brightness || settings.temperature || settings.saturation || grain.strength !== "off") {
+      const field = grain.strength !== "off"
+        ? createFilmGrainField(width, height, crop, selection.grainSeed, grain.size)
+        : null;
+      const pixelsPerBand = field ? 400_000 : 800_000;
+      const rows = Math.max(1, Math.floor(pixelsPerBand / width));
+      const grainBuffer = field && new Float32Array(width * Math.min(rows, height));
       for (let y = 0; y < height; y += rows) {
-        const pixels = context.getImageData(0, y, width, Math.min(rows, height - y));
+        const rowCount = Math.min(rows, height - y);
+        const pixels = context.getImageData(0, y, width, rowCount);
         editPixels(pixels.data, settings);
+        if (field) applyFilmGrain(pixels.data, field(y, rowCount, grainBuffer), grain.strength);
         context.putImageData(pixels, 0, y);
         await new Promise(resolve => setTimeout(resolve, 0));
       }
@@ -388,6 +416,38 @@ function updatePreset() {
   const activeName = tile.hidden ? `目前套用 ${tile.querySelector(".preset-tile").textContent} · ` : "";
   elements["preset-note"].textContent = activeName + option.dataset.note;
   elements.strength.disabled = !photoPresets[option.value];
+  updateGrainControls();
+  queuePreview();
+}
+
+function setGrainControlsOpen(open) {
+  elements["grain-toggle"].setAttribute("aria-expanded", String(open));
+  elements["grain-controls"].hidden = !open;
+  elements["grain-reset"].hidden = !open;
+  elements["strength-label"].hidden = open;
+  elements.strength.hidden = open;
+}
+
+function updateGrainControls() {
+  const presetId = selectedPreset().value;
+  const { strength, size } = selectedGrain(presetId);
+  elements["grain-strength"].value = strength;
+  elements["grain-size"].value = size;
+  elements["grain-size"].disabled = strength === "off";
+  elements["grain-reset"].disabled = !photo?.grainOverrides.has(presetId);
+  elements["grain-status"].textContent = strength === "off"
+    ? "關閉"
+    : `${strength === "weak" ? "弱" : "強"}・${size === "fine" ? "細" : "粗"}`;
+}
+
+function saveGrainControls() {
+  const presetId = selectedPreset().value;
+  const strength = elements["grain-strength"].value;
+  const size = elements["grain-size"].value;
+  const defaults = filmGrainProfiles[presetId] ?? defaultFilmGrain;
+  if (strength === defaults.strength && size === defaults.size) photo.grainOverrides.delete(presetId);
+  else photo.grainOverrides.set(presetId, { strength, size });
+  updateGrainControls();
   queuePreview();
 }
 
@@ -555,6 +615,11 @@ for (const button of toolButtons) {
 }
 elements["tool-dock"].addEventListener("keydown", event => {
   if (event.key !== "Escape") return;
+  if (!elements["grain-controls"].hidden) {
+    setGrainControlsOpen(false);
+    elements["grain-toggle"].focus();
+    return;
+  }
   const active = toolButtons.find(button => button.getAttribute("aria-expanded") === "true");
   if (!active) return;
   setActiveTool();
@@ -567,6 +632,15 @@ elements["file-input"].addEventListener("change", event => {
 });
 elements["filter-series"].addEventListener("change", updateFilterSeries);
 elements.preset.addEventListener("change", updatePreset);
+elements["grain-toggle"].addEventListener("click", () => setGrainControlsOpen(elements["grain-controls"].hidden));
+elements["grain-strength"].addEventListener("change", saveGrainControls);
+elements["grain-size"].addEventListener("change", saveGrainControls);
+elements["grain-reset"].addEventListener("click", () => {
+  photo.grainOverrides.delete(selectedPreset().value);
+  updateGrainControls();
+  elements["grain-strength"].focus();
+  queuePreview();
+});
 for (const id of colorControls) elements[id].addEventListener("input", updateColorControls);
 elements["reset-adjustments"].addEventListener("click", resetAdjustments);
 elements["preview-mode"].addEventListener("change", updatePreviewMode);
