@@ -4,7 +4,7 @@ const elements = Object.fromEntries([
   "chooser", "editor", "chooser-status", "back-to-chooser", "return-editor", "tool-dock",
   "sample-button", "open-preview", "preview-dialog", "close-preview", "fullscreen-photo",
   "stage", "stage-message", "comparison", "photo", "original", "graded",
-  "split", "file-label", "dimensions", "file-input", "dropzone", "preset", "preset-note", "strength",
+  "split", "file-label", "dimensions", "file-input", "dropzone", "filter-series", "preset", "preset-note", "strength",
   "strength-value", "brightness", "brightness-value", "temperature", "temperature-value",
   "saturation", "saturation-value", "reset-adjustments", "preview-mode", "hold-original", "compare-hint",
   "held-preview", "held-original", "open-crop", "export-size", "export-dimensions", "format-box",
@@ -384,9 +384,19 @@ function queuePreview() {
 
 function updatePreset() {
   const option = selectedPreset();
-  elements["preset-note"].textContent = option.dataset.note;
+  const tile = option.closest("label");
+  const activeName = tile.hidden ? `目前套用 ${tile.querySelector(".preset-tile").textContent} · ` : "";
+  elements["preset-note"].textContent = activeName + option.dataset.note;
   elements.strength.disabled = !photoPresets[option.value];
   queuePreview();
+}
+
+function updateFilterSeries() {
+  const series = elements["filter-series"].querySelector("input:checked").value;
+  for (const tile of elements.preset.querySelectorAll("[data-series]")) {
+    tile.hidden = tile.dataset.series !== series;
+  }
+  updatePreset();
 }
 
 function updateColorControls() {
@@ -555,6 +565,7 @@ elements["file-input"].addEventListener("change", event => {
   event.target.value = "";
   if (file) loadPhoto(file);
 });
+elements["filter-series"].addEventListener("change", updateFilterSeries);
 elements.preset.addEventListener("change", updatePreset);
 for (const id of colorControls) elements[id].addEventListener("input", updateColorControls);
 elements["reset-adjustments"].addEventListener("click", resetAdjustments);
@@ -585,6 +596,6 @@ for (const target of [elements.dropzone, elements.stage]) {
   });
 }
 
-updatePreset();
+updateFilterSeries();
 updatePreviewMode();
 updateColorControls();

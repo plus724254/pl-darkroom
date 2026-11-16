@@ -105,4 +105,16 @@ const photoPresets = {
     highlights: [0, 0, 0],
   })),
   "color-effect": createPreset("彩色效果", colorEffectDelta),
+  "r-positive": createPreset("R正片", rgb => toneDelta(rgb, {
+    contrast: 0.68,
+    saturation: 1.22,
+    shadows: [-0.028, -0.011, 0.019],
+    highlights: [0.028, 0.010, -0.016],
+  })),
+  "r-negative": createPreset("R負片", rgb => toneDelta(rgb, {
+    contrast: -0.35,
+    saturation: 0.83,
+    shadows: [0.041, 0.047, 0.036],
+    highlights: [0.018, -0.005, -0.035],
+  })),
 };

@@ -75,32 +75,47 @@
 
       <div id="tool-dock" class="tool-dock">
         <section id="filter-panel" class="tool-panel filter-panel" aria-labelledby="filter-tool" tabindex="-1" hidden>
-          <fieldset class="setting preset-field" id="preset" aria-describedby="preset-note">
-            <legend class="sr-only">濾鏡風格</legend>
-            <div class="preset-options">
-              <label class="preset-option">
-                <input type="radio" name="preset" value="none" data-note="未套用濾鏡。" checked>
-                <span class="preset-tile">無</span>
-              </label>
-              <label class="preset-option">
-                <input type="radio" name="preset" value="positive" data-note="低飽和、冷暗部，帶有紀實感。">
-                <span class="preset-tile">經典正片</span>
-              </label>
-              <label class="preset-option">
-                <input type="radio" name="preset" value="negative" data-note="暗部偏青綠、亮部帶洋紅，對比更深。">
-                <span class="preset-tile">經典負片</span>
-              </label>
-              <label class="preset-option">
-                <input type="radio" name="preset" value="standard" data-note="自然色彩與適中對比，適合日常照片。">
-                <span class="preset-tile">標準／通用</span>
-              </label>
-              <label class="preset-option">
-                <input type="radio" name="preset" value="color-effect" data-note="加深高飽和紅、黃、綠色的層次。">
-                <span class="preset-tile">彩色效果</span>
-              </label>
-            </div>
-            <p class="style-note" id="preset-note">未套用濾鏡。</p>
-          </fieldset>
+          <div class="filter-picker">
+            <fieldset id="filter-series" class="preview-modes filter-series">
+              <legend class="sr-only">濾鏡系列</legend>
+              <label><input type="radio" name="filter-series" value="f" checked><span>F Series</span></label>
+              <label><input type="radio" name="filter-series" value="r"><span>R Series</span></label>
+            </fieldset>
+            <fieldset class="setting preset-field" id="preset" aria-describedby="preset-note">
+              <legend class="sr-only">濾鏡風格</legend>
+              <div class="preset-options">
+                <label class="preset-option">
+                  <input type="radio" name="preset" value="none" data-note="未套用濾鏡。" checked>
+                  <span class="preset-tile">無</span>
+                </label>
+                <label class="preset-option" data-series="f">
+                  <input type="radio" name="preset" value="positive" data-note="低飽和、冷暗部，帶有紀實感。">
+                  <span class="preset-tile">經典正片</span>
+                </label>
+                <label class="preset-option" data-series="f">
+                  <input type="radio" name="preset" value="negative" data-note="暗部偏青綠、亮部帶洋紅，對比更深。">
+                  <span class="preset-tile">經典負片</span>
+                </label>
+                <label class="preset-option" data-series="f">
+                  <input type="radio" name="preset" value="standard" data-note="自然色彩與適中對比，適合日常照片。">
+                  <span class="preset-tile">標準／通用</span>
+                </label>
+                <label class="preset-option" data-series="f">
+                  <input type="radio" name="preset" value="color-effect" data-note="加深高飽和紅、黃、綠色的層次。">
+                  <span class="preset-tile">彩色效果</span>
+                </label>
+                <label class="preset-option" data-series="r" hidden>
+                  <input type="radio" name="preset" value="r-positive" data-note="色彩濃郁、對比鮮明，暗部微冷。">
+                  <span class="preset-tile">正片</span>
+                </label>
+                <label class="preset-option" data-series="r" hidden>
+                  <input type="radio" name="preset" value="r-negative" data-note="微褪色、柔和對比，亮部帶暖色。">
+                  <span class="preset-tile">負片</span>
+                </label>
+              </div>
+              <p class="style-note" id="preset-note">未套用濾鏡。</p>
+            </fieldset>
+          </div>
 
           <div class="setting strength-setting">
             <div class="label-row"><label class="field-label" for="strength">濾鏡強度</label><output id="strength-value" for="strength">100%</output></div>
