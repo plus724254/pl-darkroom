@@ -77,65 +77,77 @@ function filmColorDelta([red, green, blue], tone, chroma) {
   const redGreen = (red - green) * chromaWeight;
   const blueGreen = (blue - green) * chromaWeight;
   const centeredLuma = 2 * luma - 1;
+  const midtoneWeight = 4 * luma * (1 - luma);
   const features = [
     redGreen, blueGreen, redGreen * centeredLuma, blueGreen * centeredLuma,
     redGreen ** 2, redGreen * blueGreen, blueGreen ** 2,
+    redGreen * midtoneWeight, blueGreen * midtoneWeight,
+    redGreen ** 2 * centeredLuma, redGreen * blueGreen * centeredLuma, blueGreen ** 2 * centeredLuma,
   ];
 
   return tone[index].map((value, channel) => {
     const offset = mix(value, tone[index + 1][channel], fraction);
-    return features.reduce((sum, feature, i) => sum + feature * chroma[i][channel], offset);
+    return chroma.reduce((sum, coefficient, i) => sum + features[i] * coefficient[channel], offset);
   });
 }
 
-// Tone and chroma offsets are in 8-bit sRGB code values, fitted to aligned
-// Standard / Film renders from GR III in-camera RAW development.
-// https://ameblo.jp/pryce16/entry-12785797026.html
-// Positive also uses the labeled GR III HDF harbor pair from the same exposure.
-// https://pui-log.com/entry/2025/11/03/『GRⅣ』と『GRⅢ』の色の違いを見てみる
+// GR III color offsets in sRGB, fitted to paired Standard and Film renders
+// of real DNGs with Camera Matching profiles, then checked against in-camera
+// JPEG comparisons by mookio, hisway and Everyday GR. The fit is blended with
+// the earlier camera JPEG calibration to limit extrapolation.
 const ricohPositiveTone = [
   [0, 0, 0],
-  [-6.58, -6.48, -7.65],
-  [-11.36, -11.68, -13.90],
-  [-18.13, -18.96, -17.72],
-  [-19.19, -18.69, -16.08],
-  [-12.83, -12.08, -11.76],
-  [-7.26, -5.93, -6.02],
-  [-3.47, -1.66, -1.98],
-  [-0.23, -0.12, 0.76],
-  [0.19, 0.70, 2.33],
+  [-5.95, -5.76, -6.36],
+  [-11.73, -11.56, -13.13],
+  [-18.03, -19.27, -19.06],
+  [-19.59, -19.65, -17.39],
+  [-13.78, -12.23, -10.99],
+  [-6.20, -5.72, -6.09],
+  [-2.81, -2.49, -3.68],
+  [-0.63, -1.67, -2.31],
+  [-1.71, -1.17, 1.51],
   [0, 0, 0],
 ];
 const ricohPositiveChroma = [
-  [16.54, -1.00, -15.27],
-  [-35.96, -19.24, -44.03],
-  [4.27, -18.77, -21.41],
-  [-7.02, 10.11, 24.24],
-  [-4.47, -2.61, -1.41],
-  [5.88, 5.81, 2.04],
-  [-3.85, -5.26, -0.26],
+  [-3.66, 3.10, 4.66],
+  [-19.00, -6.60, -47.76],
+  [34.10, -15.09, -11.96],
+  [-21.70, -1.36, 28.18],
+  [-0.24, -0.01, 5.89],
+  [13.95, 3.06, -11.61],
+  [-22.04, -5.54, 42.92],
+  [32.15, -7.96, -15.58],
+  [-36.12, -5.25, 16.95],
+  [-4.46, -2.47, -3.83],
+  [3.88, -0.06, 6.77],
+  [-5.89, -0.89, -13.32],
 ];
 const ricohNegativeTone = [
   [0, 0, 0],
-  [0.10, -0.02, 0.13],
-  [1.14, 0.99, 1.26],
-  [5.61, 5.39, 5.58],
-  [10.27, 10.34, 10.12],
-  [13.94, 14.09, 13.57],
-  [15.54, 15.62, 15.12],
-  [13.41, 13.38, 13.47],
-  [9.71, 9.67, 8.87],
-  [5.79, 5.35, 6.39],
+  [2.07, 1.26, 1.42],
+  [4.13, 2.66, 2.92],
+  [7.33, 8.35, 8.03],
+  [11.44, 12.42, 12.27],
+  [14.15, 15.14, 15.07],
+  [15.08, 15.67, 15.30],
+  [13.89, 13.59, 12.73],
+  [9.85, 8.04, 6.42],
+  [4.98, 3.52, 6.41],
   [0, 0, 0],
 ];
 const ricohNegativeChroma = [
-  [31.17, 52.70, 12.69],
-  [57.00, 52.60, -49.49],
-  [-17.43, 14.04, 26.94],
-  [-5.87, -12.81, -35.40],
-  [-6.42, 50.62, 27.55],
-  [-25.44, -28.05, -27.78],
-  [24.03, 30.98, 30.80],
+  [20.09, 29.84, 8.98],
+  [38.36, 31.63, -37.73],
+  [-22.48, -1.89, 18.99],
+  [-1.70, -10.92, -30.91],
+  [1.67, 25.74, 7.30],
+  [-21.67, -15.57, -8.66],
+  [36.86, 37.85, 18.37],
+  [6.10, 14.73, 0.96],
+  [15.80, 19.05, -12.48],
+  [-0.33, -4.15, 0.03],
+  [2.86, 2.54, 1.10],
+  [-8.96, -12.12, -1.04],
 ];
 
 // Fujifilm tone and chroma offsets fitted to aligned comparisons by Take Kayo,
