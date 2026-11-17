@@ -1,29 +1,5 @@
 "use strict";
 
-// Adjust tone and saturation in sRGB, then add a tint weighted by tonal range.
-function toneDelta(rgb, { contrast, saturation, shadows, highlights }) {
-  const [red, green, blue] = rgb;
-  const luma = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-  const tone = contrast * luma * (1 - luma) * (2 * luma - 1);
-  const shadowWeight = (1 - luma) ** 2;
-  const highlightWeight = luma ** 2;
-
-  return rgb.map((channel, i) => 255 * (
-    tone + (saturation - 1) * (channel - luma)
-    + shadows[i] * shadowWeight + highlights[i] * highlightWeight
-  ));
-}
-
-function colorEffectDelta([red, green, blue]) {
-  const warmest = Math.max(red, green);
-  const chroma = Math.max(red, green, blue) - Math.min(red, green, blue);
-  const colorWeight = Math.max(0, chroma - 0.18);
-  const hueWeight = Math.max(0, warmest - blue);
-  const depth = 255 * 0.82 * colorWeight * hueWeight * (1 - 0.55 * warmest);
-
-  return [-depth * red, -depth * green, -depth * (blue + 0.25)];
-}
-
 // Preview and export share the same interpolated color grid.
 
 const COLOR_GRID_STEPS = 16;
@@ -31,17 +7,14 @@ const COLOR_GRID_SIDE = COLOR_GRID_STEPS + 1;
 const GREEN_STRIDE = 3 * COLOR_GRID_SIDE;
 const BLUE_STRIDE = GREEN_STRIDE * COLOR_GRID_SIDE;
 
-function buildColorGrid(getDelta, protectExtremes) {
+function buildColorGrid(getDelta) {
   const grid = new Float32Array(BLUE_STRIDE * COLOR_GRID_SIDE);
   let i = 0;
   for (let b = 0; b <= COLOR_GRID_STEPS; b++) {
     for (let g = 0; g <= COLOR_GRID_STEPS; g++) {
       for (let r = 0; r <= COLOR_GRID_STEPS; r++) {
         const rgb = [r, g, b].map(value => value / COLOR_GRID_STEPS);
-        const edgeWeight = protectExtremes
-          ? Math.min(1, 10 * Math.max(...rgb), 10 * (1 - Math.min(...rgb)))
-          : 1;
-        for (const delta of getDelta(rgb)) grid[i++] = delta * edgeWeight;
+        for (const delta of getDelta(rgb)) grid[i++] = delta;
       }
     }
   }
@@ -82,20 +55,20 @@ function applyColorGrid(pixels, strength, grid) {
   }
 }
 
-function createPreset(suffix, getDelta, { protectExtremes = true } = {}) {
-  const grid = buildColorGrid(getDelta, protectExtremes);
+function createPreset(suffix, getDelta) {
+  const grid = buildColorGrid(getDelta);
   return { grade: (pixels, strength) => applyColorGrid(pixels, strength, grid), suffix };
 }
 
-const RICOH_TONE_LEVELS = [0, 16, 32, 64, 96, 128, 160, 192, 224, 240, 255];
+const TONE_LEVELS = [0, 16, 32, 64, 96, 128, 160, 192, 224, 240, 255];
 
-function ricohColorDelta([red, green, blue], tone, chroma) {
+function filmColorDelta([red, green, blue], tone, chroma) {
   const luma = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
   const code = luma * 255;
   let index = 0;
-  while (index < RICOH_TONE_LEVELS.length - 2 && code > RICOH_TONE_LEVELS[index + 1]) index++;
-  const lower = RICOH_TONE_LEVELS[index];
-  const fraction = (code - lower) / (RICOH_TONE_LEVELS[index + 1] - lower);
+  while (index < TONE_LEVELS.length - 2 && code > TONE_LEVELS[index + 1]) index++;
+  const lower = TONE_LEVELS[index];
+  const fraction = (code - lower) / (TONE_LEVELS[index + 1] - lower);
 
   // Taper the fitted chroma correction for very saturated inputs that the samples rarely cover.
   const spread = Math.max(red, green, blue) - Math.min(red, green, blue);
@@ -165,32 +138,104 @@ const ricohNegativeChroma = [
   [24.03, 30.98, 30.80],
 ];
 
-// Fuji coefficients fitted to four Provia/target comparison scenes, then
-// validated against a separate author's scene. See audit/results/fit-experiment.json.
+// Fujifilm tone and chroma offsets fitted to aligned comparisons by Take Kayo,
+// John Peltier and X. H. Provia is the input for the classic simulations.
+// Standard uses the softer Pro Neg. Std as the input and Provia as the target.
+const classicChromeTone = [
+  [0, 0, 0],
+  [-6.11, -6.03, -6.41],
+  [-7.61, -6.74, -6.38],
+  [-5.41, -5.56, -4.70],
+  [-1.66, -1.49, -1.62],
+  [0.53, 1.02, 1.25],
+  [5.12, 4.65, 4.43],
+  [4.45, 3.96, 3.33],
+  [2.75, 1.69, 1.59],
+  [1.03, 0.87, 1.72],
+  [0, 0, 0],
+];
+const classicChromeChroma = [
+  [-19.99, 12.30, 9.33],
+  [-13.87, 11.73, -65.26],
+  [-0.75, -0.75, -0.53],
+  [6.44, -1.00, -5.44],
+  [0.64, 22.83, 15.22],
+  [34.55, -1.49, -7.73],
+  [-12.82, -0.01, -14.97],
+];
+
+const classicNegativeTone = [
+  [0, 0, 0],
+  [-0.96, 1.41, -0.94],
+  [-5.17, -0.30, -1.64],
+  [-11.49, -8.39, -7.92],
+  [-8.80, -6.05, -5.26],
+  [8.83, 5.28, 4.80],
+  [28.14, 18.08, 12.49],
+  [29.66, 20.23, 15.63],
+  [18.97, 10.69, 6.30],
+  [10.25, 4.99, 3.05],
+  [0, 0, 0],
+];
+const classicNegativeChroma = [
+  [-36.64, 0.54, -38.44],
+  [25.60, 30.10, -69.23],
+  [-17.83, -27.61, -14.45],
+  [-0.55, -5.20, 2.10],
+  [19.30, 6.18, -0.07],
+  [-49.58, -20.59, -22.53],
+  [0.49, 8.48, 22.81],
+];
+
+const proviaTone = [
+  [0, 0, 0],
+  [-2.32, -2.98, -2.72],
+  [-2.69, -3.82, -3.62],
+  [-1.47, -2.55, -3.52],
+  [-1.14, -0.17, -1.82],
+  [-0.49, -0.58, 0.28],
+  [0.28, -0.38, -0.27],
+  [-0.22, -0.67, -0.23],
+  [-0.75, -1.28, -1.39],
+  [-0.93, -1.40, -0.44],
+  [0, 0, 0],
+];
+const proviaChroma = [
+  [46.49, 2.95, -16.83],
+  [-2.43, 2.13, 41.75],
+  [-26.03, 7.55, 11.58],
+  [-9.68, 9.73, -16.45],
+  [-31.06, -14.37, -4.16],
+  [-23.44, 2.44, -11.94],
+  [-16.74, -0.49, -13.73],
+];
+
+// Color Chrome OFF / STRONG comparisons from Fujifilm and Hirophotalk.
+const colorChromeCoefficients = [
+  [-64.48, -55.51, -69.30],
+  [77.60, 72.66, 64.19],
+  [-4.14, -16.64, 12.86],
+  [22.45, 18.96, 19.55],
+];
+
+function colorEffectDelta([red, green, blue]) {
+  const spread = Math.max(red, green, blue) - Math.min(red, green, blue);
+  // A one-cell neutral margin prevents interpolation from tinting gray pixels.
+  const neutralWeight = Math.min(1, Math.max(0, (spread - 1 / COLOR_GRID_STEPS) * 12));
+  const colorWeight = Math.max(0, Math.max(red, green) - blue) * neutralWeight;
+  const luma = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  const [base, lightness, saturation, redGreen] = colorChromeCoefficients;
+
+  return base.map((value, i) => colorWeight * (
+    value + lightness[i] * luma + saturation[i] * spread + redGreen[i] * (red - green)
+  ));
+}
+
 const photoPresets = {
-  positive: createPreset("經典正片", rgb => toneDelta(rgb, {
-    contrast: 0.1185695166943149,
-    saturation: 0.8336440326237472,
-    shadows: [-0.02321060552877227, -0.011717968165747439, -0.01191791703070777],
-    highlights: [-0.0018865382372726253, 0.013324153778729982, 0.0048309497764622775],
-  })),
-  negative: createPreset("經典負片", rgb => toneDelta(rgb, {
-    contrast: 0.8623534335825805,
-    saturation: 0.7974396530535328,
-    shadows: [0.06679644167992155, 0.09176561880369541, 0.08225768850853139],
-    highlights: [0.05935442837448009, -0.013328365687180953, -0.033134362079884544],
-  })),
-  standard: createPreset("標準通用", rgb => toneDelta(rgb, {
-    contrast: 0.22,
-    saturation: 1.06,
-    shadows: [0, 0, 0],
-    highlights: [0, 0, 0],
-  })),
+  positive: createPreset("經典正片", rgb => filmColorDelta(rgb, classicChromeTone, classicChromeChroma)),
+  negative: createPreset("經典負片", rgb => filmColorDelta(rgb, classicNegativeTone, classicNegativeChroma)),
+  standard: createPreset("標準通用", rgb => filmColorDelta(rgb, proviaTone, proviaChroma)),
   "color-effect": createPreset("彩色效果", colorEffectDelta),
-  "r-positive": createPreset(
-    "R正片", rgb => ricohColorDelta(rgb, ricohPositiveTone, ricohPositiveChroma), { protectExtremes: false },
-  ),
-  "r-negative": createPreset(
-    "R負片", rgb => ricohColorDelta(rgb, ricohNegativeTone, ricohNegativeChroma), { protectExtremes: false },
-  ),
+  "r-positive": createPreset("R正片", rgb => filmColorDelta(rgb, ricohPositiveTone, ricohPositiveChroma)),
+  "r-negative": createPreset("R負片", rgb => filmColorDelta(rgb, ricohNegativeTone, ricohNegativeChroma)),
 };
