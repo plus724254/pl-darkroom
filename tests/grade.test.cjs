@@ -38,3 +38,29 @@ test("color effect preserves neutral gray and blue, and deepens colorful reds an
   assert.ok(colors[0] < 220);
   assert.ok(colors[5] < 210);
 });
+
+test("all 17 presets preserve zero strength, transparency, and monochrome neutrality", () => {
+  assert.equal(Object.keys(presets).length, 17);
+  const sample = new Uint8ClampedArray([
+    210, 80, 60, 255,
+    60, 175, 95, 255,
+    55, 120, 215, 255,
+    180, 145, 120, 0,
+  ]);
+  for (const [name, { grade }] of Object.entries(presets)) {
+    const zero = sample.slice();
+    grade(zero, 0);
+    assert.deepEqual(zero, sample, `${name} changed pixels at 0% strength`);
+
+    const full = sample.slice();
+    grade(full, 1);
+    assert.deepEqual(full.slice(12, 16), sample.slice(12, 16), `${name} changed transparent pixel`);
+
+    if (name === "acros" || name === "acros-red") {
+      for (let i = 0; i < 12; i += 4) {
+        assert.equal(full[i], full[i + 1], `${name} R!=G`);
+        assert.equal(full[i + 1], full[i + 2], `${name} G!=B`);
+      }
+    }
+  }
+});
